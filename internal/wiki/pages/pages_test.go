@@ -252,7 +252,7 @@ func TestUpdatePageUseCase_HappyPath(t *testing.T) {
 	}
 }
 
-func TestUpdatePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
+func TestUpdatePageUseCase_VersionConflict_ReturnsVersionConflictError(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
@@ -292,12 +292,35 @@ func TestUpdatePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected version conflict, got nil")
 	}
-	loc, ok := sharederrors.AsLocalizedError(err)
-	if !ok {
-		t.Fatalf("expected localized error, got %T: %v", err, err)
+	if !errors.Is(err, tree.ErrVersionConflict) {
+		t.Fatalf("expected tree.ErrVersionConflict, got %T: %v", err, err)
 	}
-	if loc.Code != pages.ErrCodePageVersionConflict {
-		t.Fatalf("expected %q, got %q", pages.ErrCodePageVersionConflict, loc.Code)
+}
+
+func TestUpdatePageUseCase_VersionUncheckedSentinel_TreatedAsVersionRequired(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+
+	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Page", Slug: "page", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating page: %v", err)
+	}
+
+	content := "new content"
+	_, err = updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID:  "user1",
+		ID:      created.Page.ID,
+		Version: tree.VersionUnchecked,
+		Title:   "Page",
+		Slug:    "page",
+		Content: &content,
+		Kind:    pageKind(),
+	})
+	if !errors.Is(err, tree.ErrVersionRequired) {
+		t.Fatalf("expected ErrVersionRequired when sending VersionUnchecked sentinel, got %v", err)
 	}
 }
 
@@ -412,7 +435,7 @@ func TestMovePageUseCase_HappyPath(t *testing.T) {
 	}
 }
 
-func TestMovePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
+func TestMovePageUseCase_VersionConflict_ReturnsVersionConflictError(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
@@ -465,12 +488,8 @@ func TestMovePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected version conflict, got nil")
 	}
-	loc, ok := sharederrors.AsLocalizedError(err)
-	if !ok {
-		t.Fatalf("expected localized error, got %T: %v", err, err)
-	}
-	if loc.Code != pages.ErrCodePageVersionConflict {
-		t.Fatalf("expected %q, got %q", pages.ErrCodePageVersionConflict, loc.Code)
+	if !errors.Is(err, tree.ErrVersionConflict) {
+		t.Fatalf("expected tree.ErrVersionConflict, got %T: %v", err, err)
 	}
 }
 

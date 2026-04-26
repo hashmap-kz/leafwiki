@@ -56,11 +56,10 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		return nil, ve
 	}
 
+	in.Version = sanitizeClientVersion(in.Version)
+
 	before, err := uc.tree.GetPage(in.ID)
 	if err != nil {
-		return nil, err
-	}
-	if err := requireCurrentPageVersion(before, in.Version); err != nil {
 		return nil, err
 	}
 
@@ -78,7 +77,7 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		}
 	}
 
-	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content); err != nil {
+	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version); err != nil {
 		return nil, err
 	}
 

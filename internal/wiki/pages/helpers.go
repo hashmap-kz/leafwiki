@@ -1,12 +1,19 @@
 package pages
 
 import (
-	"fmt"
-
 	"github.com/perber/wiki/internal/core/revision"
-	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
+
+// sanitizeClientVersion rejects the internal VersionUnchecked sentinel so
+// external callers cannot bypass optimistic locking by sending the sentinel value.
+// Treated as "no version provided" — produces ErrVersionRequired for versioned nodes.
+func sanitizeClientVersion(v string) string {
+	if v == tree.VersionUnchecked {
+		return ""
+	}
+	return v
+}
 
 // collectSubtreeIDs returns all page IDs within a subtree (excluding "root").
 func collectSubtreeIDs(node *tree.PageNode) []string {
@@ -36,34 +43,6 @@ func deleteRevisionData(svc *revision.Service, pageIDs []string) error {
 		if err := svc.DeletePageData(id); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func requireCurrentPageVersion(page *tree.Page, expectedVersion string) error {
-	if page == nil {
-		return fmt.Errorf("page is nil")
-	}
-	pageVersion := page.Version()
-	// Legacy page with no UpdatedAt: skip locking for backward compatibility.
-	if pageVersion == "" {
-		return nil
-	}
-	if expectedVersion == "" {
-		return sharederrors.NewLocalizedError(
-			ErrCodePageVersionRequired,
-			"Page version is required",
-			"page version is required",
-			nil,
-		)
-	}
-	if pageVersion != expectedVersion {
-		return sharederrors.NewLocalizedError(
-			ErrCodePageVersionConflict,
-			"Page was changed by another request",
-			"page was changed by another request",
-			nil,
-		)
 	}
 	return nil
 }

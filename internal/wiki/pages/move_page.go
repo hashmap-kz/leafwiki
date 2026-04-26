@@ -38,6 +38,8 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		return newPageRootOperationError("move")
 	}
 
+	in.Version = sanitizeClientVersion(in.Version)
+
 	var subtreeIDs []string
 	var beforePage *tree.Page
 
@@ -60,16 +62,12 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		beforePage = p
 	}
 
-	if err := requireCurrentPageVersion(beforePage, in.Version); err != nil {
-		return err
-	}
-
 	var oldPath string
 	if beforePage != nil {
 		oldPath = beforePage.CalculatePath()
 	}
 
-	if err := uc.tree.MoveNode(in.UserID, in.ID, in.ParentID); err != nil {
+	if err := uc.tree.MoveNode(in.UserID, in.ID, in.ParentID, in.Version); err != nil {
 		return err
 	}
 
